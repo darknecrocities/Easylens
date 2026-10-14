@@ -56,6 +56,10 @@ EasyLens is an accessibility assistant mobile application designed for visually 
 - `http: ^1.2.1` — REST calls (Google Maps routing, Ollama, Geocoding, ESP32)
 - `flutter_dotenv: ^5.2.1` — `.env` secrets management
 
+#### Containerization & DevOps
+- Docker & Docker Compose — Containerized web application portal & NGINX distribution
+- GitHub Actions & GHCR — Automated CI/CD test, build, and container publishing
+
 ---
 
 ### 03 — ARCHITECTURE
@@ -104,6 +108,7 @@ graph TD
 | **Setup & Cloud Config** | [`security_configuration.md`](docs/setup/security_configuration.md) | Security key management, `.env` file templates, and credential isolation. |
 | | [`cloudflare_r2_setup.md`](docs/setup/cloudflare_r2_setup.md) | Cloudflare R2 bucket setup, CORS policy, and AWS SigV4 signing configuration. |
 | | [`cicd_pipeline.md`](docs/setup/cicd_pipeline.md) | Continuous Integration and release build pipeline specifications. |
+| | [`DOCKER.md`](DOCKER.md) | Docker containerization guide, Compose orchestration, and local demo steps. |
 | **Releases & Navigation** | [`releases.md`](docs/releases.md) | Official release notes and version changelog history (v1.0 - v20.0). |
 | | [`readme.md`](docs/readme.md) | Documentation index map and topic directory guide. |
 | **Canonical Reference** | [`readme.md`](docs/source-of-truth/readme.md) | Canonical source-of-truth technical specifications (Chapters 01 - 10). |
@@ -184,6 +189,135 @@ To stream live video into the object detection pipeline, you must connect your m
 > **Password:** *(None / Open Network)*  
 
 Flash the `hardware/esp32_cam_wifi_ap/esp32_cam_wifi_ap.ino` sketch to your ESP32-CAM module to initiate the MJPEG stream.
+
+#### 🐳 Docker Container & Web Portal Deployment
+
+EasyLens includes a production containerized NGINX web and application distribution portal. Anyone can deploy and run it locally or in cloud environments using Docker without needing Flutter, Android SDK, or Java pre-installed.
+
+> 💻 **Cross-Platform Compatibility:** The containerized portal and CI/CD packages are built for multi-architecture support (`linux/amd64` and `linux/arm64`). Fully compatible across **Windows 10/11** (PowerShell / Command Prompt / WSL2), **macOS** (Apple Silicon M1/M2/M3/M4 & Intel), and **Linux** (Ubuntu / Debian / Arch / Fedora).
+>
+> For full architecture, Dockerfile breakdown, and CI/CD pipeline specifications, see [`DOCKER.md`](DOCKER.md).
+
+##### Deployment Options Overview
+
+| Deployment Method | Mechanism | Ideal Use Case |
+|---|---|---|
+| **Local Build (Docker Compose)** | Clones source repository and builds container image locally via Compose. | Local development, code modification, testing, and full local orchestration. |
+| **Standalone Docker CLI** | Builds and executes the container directly using native Docker CLI commands. | Lightweight testing, custom container arguments, or environments without Compose. |
+| **Pre-built Package (GHCR)** | Pulls pre-compiled multi-arch image (`linux/amd64`, `linux/arm64`) from GitHub Packages. | Production cloud hosting (AWS, GCP, DigitalOcean), CI/CD, or running without cloning source files. |
+
+---
+
+##### Option 1: Local Build via Docker Compose (Recommended)
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Thes-IS-IT/Easylens.git
+   cd Easylens
+   ```
+
+2. **Build and launch the container:**
+   ```bash
+   docker compose up --build -d
+   ```
+
+3. **Verify container status and health:**
+   ```bash
+   docker compose ps
+   curl -I http://localhost:8080/
+   ```
+
+4. **Access the web portal:**
+   Open `http://localhost:8080` in your web browser.
+
+5. **Stop the container:**
+   ```bash
+   docker compose down
+   ```
+
+---
+
+##### Option 2: Standalone Docker CLI (Local Build)
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t easylens:latest .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -d --name easylens_app -p 8080:80 --restart always easylens:latest
+   ```
+
+3. **Verify health check and access:**
+   ```bash
+   curl -I http://localhost:8080/
+   ```
+   Open `http://localhost:8080` in your web browser.
+
+4. **Stop and remove container:**
+   ```bash
+   docker stop easylens_app && docker rm easylens_app
+   ```
+
+---
+
+##### Option 3: Pre-Built Multi-Architecture Package (GitHub Container Registry)
+
+Run the pre-compiled container directly without cloning the repository or compiling locally:
+
+1. **Pull and run the pre-built image:**
+   ```bash
+   docker run -d --name easylens_live -p 8080:80 --restart always ghcr.io/thes-is-it/easylens:latest
+   ```
+
+2. **Verify health check and access:**
+   ```bash
+   curl -I http://localhost:8080/
+   ```
+   Open `http://localhost:8080` in your web browser.
+
+3. **Stop and remove container:**
+   ```bash
+   docker stop easylens_live && docker rm easylens_live
+   ```
+
+---
+
+##### Architectural Component Breakdown & Roles
+
+To understand how Docker interacts with the codebase versus standard Git workflows, the following table and reference outlines each component's distinct role:
+
+| Component Label | Type | Purpose | Primary Command |
+|---|---|---|---|
+| **Git Repository** | Source Control | Stores raw, editable code files (`.dart`, `.html`, `.conf`), version history, and configurations. | `git clone https://github.com/Thes-IS-IT/Easylens.git` |
+| **Container Image** | Packaged Appliance | An immutable, multi-architecture Linux snapshot bundling NGINX, web assets, and health checks. | `docker pull ghcr.io/thes-is-it/easylens:latest` |
+| **Container Instance** | Runtime Process | Active execution instance of the Docker image running on host port `8080`. | `docker run -d -p 8080:80 ghcr.io/thes-is-it/easylens:latest` |
+| **Web Portal Gateway** | Distribution UI | Interactive landing interface serving Buddy assets, APK downloads, and iOS installation guides. | Access at `http://localhost:8080` |
+| **Asset Extraction** | Container Utility | Copies assets or build outputs directly from inside a container to the host machine without Git. | `docker cp <container_name>:<path_inside> <host_path>` |
+
+###### Conceptual Difference: `git clone` vs `docker pull`
+
+- **`git clone` (Source Code Repository):**  
+  Downloads individual source files, documentation, and Git branches to your local machine for editing, code development, and manual compilation.
+- **`docker pull` (Pre-Packaged Appliance):**  
+  Downloads a self-contained, pre-compiled application appliance from GitHub Container Registry (GHCR). It does not download individual repository files to your folder; rather, the web portal and its dependencies run inside Docker's isolated runtime engine.
+
+###### Inspecting or Extracting Files from Container (`docker cp`)
+
+If you need to retrieve files or assets directly from a container to your host machine without cloning the Git repository:
+
+```bash
+# 1. Start the container
+docker run -d --name easylens_extract -p 8080:80 ghcr.io/thes-is-it/easylens:latest
+
+# 2. Copy the index.html or assets to your local directory
+docker cp easylens_extract:/usr/share/nginx/html/index.html ./index.html
+docker cp easylens_extract:/usr/share/nginx/html/app_logo.png ./app_logo.png
+
+# 3. Clean up the container
+docker stop easylens_extract && docker rm easylens_extract
+```
 
 ---
 
